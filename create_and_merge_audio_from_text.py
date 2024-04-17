@@ -1,15 +1,18 @@
 #! /usr/bin/env python3
 
-##  pip3 install gTTS pyttsx3 playsound pydub
-
 import os
 from datetime import datetime
 import gtts
 import random
 from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfgen.canvas import Canvas
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+from reportlab.lib.pagesizes import A4  # Import A4 page size definition
 from pydub import AudioSegment
+import io
+from PyPDF2 import PdfReader,PdfWriter
+from reportlab.pdfgen import canvas
 
 # 清空文件夹
 def empty_folder(folder_path):
@@ -50,21 +53,115 @@ def read_text_file(filePath):
 def shuffle_lines(lines):
     random.shuffle(lines)
     return lines
+
+# 在页脚添加页码
+def add_page_number(canvas,pdf):
+    # Retrieve page number and total page count
+    page_number = canvas.getPageNumber()
+    total_pages = len(pdf.pages)
     
+    # Draw page number centered at the bottom of the page
+    canvas.setFont('HeiseiMin-W3',9)
+    canvas.drawCentredString(
+        A4[0] / 2,
+        25,
+        f'Page {page_number} of {total_pages}'
+    )
+# 在页眉加标题
+def add_title(canvas,title):
+    # Draw the title centered at the top of the page
+    canvas.setFont('HeiseiMin-W3',16)
+    canvas.drawCentredString(
+        A4[0] / 2,
+        A4[1] - 35,
+        title
+    )
+
+# 加标题和页码
+def add_titles_and_page_numbers(input_pdf_path, output_pdf_path, titles):
+    input_pdf = PdfReader(input_pdf_path)
+    output_pdf = PdfWriter()
+
+    # 添加日语字体支持 https://www.reportlab.com/docs/reportlab-userguide.pdf
+    pdfmetrics.registerFont(UnicodeCIDFont('HeiseiMin-W3'))
+    # 添加中文字体支持
+    pdfmetrics.registerFont(UnicodeCIDFont('STSong-Light'))
+
+    for i, page in enumerate(input_pdf.pages):
+        packet = io.BytesIO()
+        can = canvas.Canvas(packet, pagesize=A4)
+        add_page_number(can, input_pdf)
+        add_title(can, titles[0])
+        can.save()
+
+        # Move to the beginning of the StringIO buffer
+        packet.seek(0)
+        new_pdf = PdfReader(packet)
+
+        # Merge the page with the existing one
+        page.merge_page(new_pdf.pages[0])
+        output_pdf.add_page(page)
+
+    # Write the combined PDF to a file
+    with open(output_pdf_path, "wb") as output_stream:
+        output_pdf.write(output_stream)
+
+
 # 将文本行写入PDF文件
 def write_to_pdf(lines, pdf_path):
-    c = canvas.Canvas(pdf_path, pagesize=letter)  # 创建一个PDF画布
-    # c.setFont("Noto Sans CJK JP", 12)  # 设置使用的字体
-    y = 750  # 设置起始的纵坐标
+        
+    # Set Page Size and Margins
+    page_width, page_height = A4
+
+    c = Canvas(pdf_path, pagesize=(page_width, page_height)) # Create the Canvas object and set page size 
+
+
+    # 添加日语字体支持 https://www.reportlab.com/docs/reportlab-userguide.pdf
+    pdfmetrics.registerFont(UnicodeCIDFont('HeiseiMin-W3'))
+    # 添加中文字体支持
+    pdfmetrics.registerFont(UnicodeCIDFont('STSong-Light'))
+
+    margin ={ # Adjust margin as needed
+        "left": 30,
+        "right": 30,
+        "top": 70,
+        "bottom": 50
+    }
+    column_width = (page_width - (margin["left"]+margin["right"])) / 3  # Calculate column width
+
+    # Define x-coordinates for each column
+    column_spacing = 10  # Adjust spacing between columns as desired
+    column_x = [margin["left"], margin["left"] + column_width, margin["left"] + 2 * column_width]
+
+    # Draw Text in Columns
+    x = column_x[0] # 设置起始的横坐标
+    y = page_height - margin["top"]  # 设置起始的纵坐标
+    c.setFont('HeiseiMin-W3', 16)
+    c.setFont('STSong-Light', 16)
+    c.setFillColor((0,0,0)) # 设置字体颜色为黑色
+
     for line in lines:
-        c.drawString(100, y, line.strip())  # 在PDF上写入文本行
-        y -= 15  # 更新纵坐标，以便下一行文本
-        if y < 50:  # 如果纵坐标超出页面范围，则创建新页面
-            c.showPage()  # 显示当前页面
-            c.save()  # 保存PDF文件
-            return  # 结束函数
-    c.showPage()  # 显示最后一页
-    c.save()  # 保存PDF文件
+        # Draw text in each column, update y-coordinate
+        c.drawString(x, y, "□ "+line.strip()) # 写字
+        y -= 28  # 更新纵坐标，以便下一行文本
+        # 调整坐标在第2列书写
+        if x==column_x[0] and y <  margin["bottom"]:
+            x = column_x[1]
+            y = page_height - margin["top"]
+        # 调整坐标在第3列书写
+        if x==column_x[1] and y < margin["bottom"]:
+            x = column_x[2]
+            y = page_height - margin["top"]
+        # 如果纵坐标超出页面范围，则创建新页面
+        if x==column_x[2] and y < margin["bottom"]:
+            c.showPage()
+            x = column_x[0]
+            y = page_height - margin["top"]
+            c.setFont('HeiseiMin-W3', 16)
+            c.setFont('STSong-Light', 16)
+            c.setFillColor("#000000") # 设置字体颜色为黑色
+
+    c.save() # 保存PDF文件
     
 # 按行生成语音
 def text_to_speech_by_lines(lines,output_folder_path):
@@ -129,14 +226,16 @@ def main():
     output_folder_path = create_folder_if_not_exists(today_date) # 以当天的日期作为文件夹名创建文件夹
     input_file = 'your_text_file.txt'  # 输入文本文件路径
     output_pdf = output_folder_path +'/'+ today_date + '.pdf'  # 输出PDF文件路径
-    merged_mp3 = output_folder_path +'/'+ today_date + '.mp3'  # 输出合并后的mp3文件路径
+    output_merged_mp3 = output_folder_path +'/'+ today_date + '.mp3'  # 输出合并后的mp3文件路径
     
     lines = read_text_file(input_file)  # 读取文本文件
-    # new_lines = shuffle_lines(lines)  # 打乱文本行的顺序
-    # text_to_speech_by_file(new_lines,output_folder_path) # 生成语音文件
+    #  new_lines = shuffle_lines(lines)  # 打乱文本行的顺序
+    #  text_to_speech_by_file(new_lines,output_folder_path) # 生成语音文件
     text_to_speech_by_lines(lines,output_folder_path)
-    merge_audio_with_silence(output_folder_path,merged_mp3) # 合并声音并插入3秒静音
-    # write_to_pdf(new_lines, output_pdf)  # 将打乱后的文本行写入PDF文件
+    merge_audio_with_silence(output_folder_path,output_merged_mp3) # 合并声音并插入3秒静音
+    write_to_pdf(lines, output_pdf)  # 将文本写入PDF文件
+    add_titles_and_page_numbers(output_pdf,output_pdf,today_date + '单词表') # 给PDF加标题和页码
+
     print("程序结束")
     
 if __name__ == "__main__":
