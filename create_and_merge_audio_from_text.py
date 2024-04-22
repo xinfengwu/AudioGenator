@@ -14,13 +14,14 @@ import io
 from PyPDF2 import PdfReader,PdfWriter
 from reportlab.pdfgen import canvas
 
-# 清空文件夹
+# 删除空文件 
 def empty_folder(folder_path):
     # 遍历文件夹中的所有文件
     for file_name in os.listdir(folder_path):
         file_path = os.path.join(folder_path, file_name)
-        # 如果是文件，则删除
-        if os.path.isfile(file_path):
+            
+        # 如果是空文件，则删除
+        if os.path.isfile(file_path) and os.path.getsize(file_path) == 0: # 空文件
             os.remove(file_path)
         # 如果是文件夹，则递归调用 empty_folder 函数清空该文件夹
         elif os.path.isdir(file_path):
@@ -169,15 +170,19 @@ def text_to_speech_by_lines(lines,output_folder_path):
     for line in lines:
         try:
             tts = gtts.gTTS(line.strip(), lang='ja')  ##  request google to get synthesis
-            tts.save(output_folder_path +'/'+ line.strip()+'.mp3')  ##  save audio
+            output_file_path = output_folder_path +'/'+ line.strip()+'.mp3'
+            if not os.path.exists(output_file_path): 
+                tts.save(output_file_path)  ##  save audio
         except Exception as e:
-            print(f"转换 '{line}' 出现错误：{e}")
+            print(f"转换 '{line.strip()}' 出现错误：{e}")
 
 # 按整个文件生成语音
 def text_to_speech_by_file(lines,output_folder_path):
     try:
-    	tts = gtts.gTTS(' '.join(lines), lang='ja')  ##  request google to get synthesis
-    	tts.save(output_folder_path +'/'+ 'output.mp3')  ##  save audio
+        tts = gtts.gTTS(' '.join(lines), lang='ja')  ##  request google to get synthesis
+        output_file_path = output_folder_path +'/'+ 'output.mp3'
+        if not os.path.exists(output_file_path): 
+            tts.save(output_file_path)  ##  save audio
     	# playsound('output.mp3')  ##  play audio
     except Exception as e:
         print(f"转换出现错误：{e}")
@@ -224,7 +229,7 @@ def main():
     
     today_date = datetime.now().strftime('%Y-%m-%d') # 获取当天日期
     output_folder_path = create_folder_if_not_exists(today_date) # 以当天的日期作为文件夹名创建文件夹
-    input_file = 'your_text_file.txt'  # 输入文本文件路径
+    input_file = today_date+'.txt'  # 输入文本文件路径
     output_pdf = output_folder_path +'/'+ today_date + '.pdf'  # 输出PDF文件路径
     output_merged_mp3 = output_folder_path +'/'+ today_date + '.mp3'  # 输出合并后的mp3文件路径
     
@@ -234,8 +239,9 @@ def main():
     text_to_speech_by_lines(lines,output_folder_path)
     merge_audio_with_silence(output_folder_path,output_merged_mp3) # 合并声音并插入3秒静音
     write_to_pdf(lines, output_pdf)  # 将文本写入PDF文件
-    add_titles_and_page_numbers(output_pdf,output_pdf,today_date + '单词表') # 给PDF加标题和页码
+    # add_titles_and_page_numbers(today_date + '.pdf',today_date + '.pdf',today_date + '单词表')
 
+    
     print("程序结束")
     
 if __name__ == "__main__":
