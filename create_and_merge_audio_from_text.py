@@ -228,6 +228,7 @@ def merge_audio_with_silence(input_folder, output_file):
 def main():
     
     today_date = datetime.now().strftime('%Y-%m-%d') # 获取当天日期
+    # today_date = "2024-04-17"
     output_folder_path = create_folder_if_not_exists(today_date) # 以当天的日期作为文件夹名创建文件夹
     input_file = today_date+'.txt'  # 输入文本文件路径
     output_pdf = output_folder_path +'/'+ today_date + '.pdf'  # 输出PDF文件路径
