@@ -47,7 +47,7 @@ def create_folder_if_not_exists(today_date):
 # 读取文本文件
 def read_text_file(filePath):
     with open(filePath, "r", encoding='utf-8') as f:
-        lines = f.readlines()
+        lines = [line for line in f.readlines() if line.strip() !== ""] # 读取文件时跳过空行        
     return lines
 
 # 打乱文本行的顺序
@@ -116,7 +116,6 @@ def write_to_pdf(lines, pdf_path):
 
     c = Canvas(pdf_path, pagesize=(page_width, page_height)) # Create the Canvas object and set page size 
 
-
     # 添加日语字体支持 https://www.reportlab.com/docs/reportlab-userguide.pdf
     pdfmetrics.registerFont(UnicodeCIDFont('HeiseiMin-W3'))
     # 添加中文字体支持
@@ -142,6 +141,7 @@ def write_to_pdf(lines, pdf_path):
     c.setFillColor((0,0,0)) # 设置字体颜色为黑色
 
     for line in lines:
+        
         # Draw text in each column, update y-coordinate
         c.drawString(x, y, "□ "+line.strip()) # 写字
         y -= 28  # 更新纵坐标，以便下一行文本
