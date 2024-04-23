@@ -155,7 +155,8 @@ def write_to_pdf(lines, pdf_path):
             y = page_height - margin["top"]
         # 如果纵坐标超出页面范围，则创建新页面
         if x==column_x[2] and y < margin["bottom"]:
-            c.showPage()
+            if line != lines[-1]: # 避免出现空白页
+                c.showPage()
             x = column_x[0]
             y = page_height - margin["top"]
             c.setFont('HeiseiMin-W3', 16)
@@ -188,20 +189,20 @@ def text_to_speech_by_file(lines,output_folder_path):
         print(f"转换出现错误：{e}")
         
 # 合成声音文件
-def merge_audio_with_silence(input_folder, output_file):
+def merge_audio_with_silence(input_folder,lines, output_file):
 
     # 筛选出所有的 mp3 文件
-    audio_files = [file for file in os.listdir(input_folder) if file.endswith(".mp3")]
+    #  audio_files = [file for file in os.listdir(input_folder) if file.endswith(".mp3")]
     
     non_empty_mp3_files = []
     # 筛选出所有不是空的 mp3 文件
-    for file in audio_files:
-        file_path = os.path.join(input_folder, file)
+    for file in lines:
+        file_path = os.path.join(input_folder, file.strip()+'.mp3')
         if os.path.getsize(file_path) > 0:
             non_empty_mp3_files.append(file_path)
             
     # 根据文件的创建时间排序
-    non_empty_mp3_files.sort(key=lambda x: os.path.getctime(os.path.join(input_folder, x)))
+    #  non_empty_mp3_files.sort(key=lambda x: os.path.getctime(os.path.join(input_folder, x)))
 
     audio_segments = []
     for file in non_empty_mp3_files:
@@ -238,7 +239,7 @@ def main():
     #  new_lines = shuffle_lines(lines)  # 打乱文本行的顺序
     #  text_to_speech_by_file(new_lines,output_folder_path) # 生成语音文件
     text_to_speech_by_lines(lines,output_folder_path)
-    merge_audio_with_silence(output_folder_path,output_merged_mp3) # 合并声音并插入3秒静音
+    merge_audio_with_silence(output_folder_path,lines,output_merged_mp3) # 合并声音并插入3秒静音
     write_to_pdf(lines, output_pdf)  # 将文本写入PDF文件
     # add_titles_and_page_numbers(today_date + '.pdf',today_date + '.pdf',today_date + '单词表')
 
